@@ -1,23 +1,26 @@
 package com.example.anemia
 
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
+import android.animation.ObjectAnimator
 import android.app.Dialog
 import android.graphics.Color
+import android.graphics.PorterDuff
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Html
 import android.util.Log
 import android.view.Window
-import android.widget.EditText
-import android.widget.ProgressBar
-import android.widget.Spinner
-import android.widget.TextView
-import android.widget.Toast
+import android.view.animation.DecelerateInterpolator
+import android.view.inputmethod.InputMethodManager
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtSession
 
 class MainActivity : AppCompatActivity() {
 
@@ -46,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etPDW: EditText
     private lateinit var etPCT: EditText
     private lateinit var btnPredict: MaterialButton
+    private lateinit var scrollView: ScrollView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,15 +57,18 @@ class MainActivity : AppCompatActivity() {
 
         initViews()
         loadModel()
+        setupKeyboardHandling()
 
         btnPredict.setOnClickListener {
             if (validateInputs()) {
+                hideKeyboard()
                 predict()
             }
         }
     }
 
     private fun initViews() {
+        scrollView = findViewById(R.id.scrollView)
         etAge = findViewById(R.id.etAge)
         spSex = findViewById(R.id.spSex)
         etHemoglobin = findViewById(R.id.etHemoglobin)
@@ -86,22 +93,55 @@ class MainActivity : AppCompatActivity() {
         btnPredict = findViewById(R.id.btnPredict)
     }
 
+    private fun setupKeyboardHandling() {
+        val allFields = listOf(
+            etAge, etHemoglobin, etESR, etWBC, etNeutrophils,
+            etLymphocytes, etMonocytes, etEosinophils, etBasophils, etRBC,
+            etHCT, etMCV, etMCH, etMCHC, etRDWCV, etRDWSD, etPlatelet,
+            etMPV, etPDW, etPCT
+        )
+
+        for (field in allFields) {
+            field.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        // Get actual position on screen
+                        val location = IntArray(2)
+                        view.getLocationInWindow(location)
+
+                        val scrollViewLocation = IntArray(2)
+                        scrollView.getLocationInWindow(scrollViewLocation)
+
+                        // Calculate how much to scroll
+                        val scrollTo = scrollView.scrollY + location[1] - scrollViewLocation[1] - 150
+
+                        scrollView.smoothScrollTo(0, scrollTo.coerceAtLeast(0))
+                    }, 350)
+                }
+            }
+        }
+
+        etPCT.setOnEditorActionListener { _, _, _ ->
+            hideKeyboard()
+            true
+        }
+    }
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        currentFocus?.let {
+            imm.hideSoftInputFromWindow(it.windowToken, 0)
+            it.clearFocus()
+        }
+    }
+
     private fun loadModel() {
         try {
             env = OrtEnvironment.getEnvironment()
-
             val modelBytes = assets.open("anemia_model.onnx").readBytes()
             session = env.createSession(modelBytes)
-
-            // Debug: Print model input/output info
-            Log.d("ONNX", "Input names: ${session.inputNames}")
-            Log.d("ONNX", "Input info: ${session.inputInfo}")
-            Log.d("ONNX", "Output names: ${session.outputNames}")
-            Log.d("ONNX", "Output info: ${session.outputInfo}")
-
+            Log.d("ONNX", "Model loaded. Inputs: ${session.inputNames}, Outputs: ${session.outputNames}")
         } catch (e: Exception) {
-            Toast.makeText(this, "Model load error: ${e.message}",
-                Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Model load error: ${e.message}", Toast.LENGTH_LONG).show()
             Log.e("ONNX", "Load error", e)
         }
     }
@@ -118,6 +158,7 @@ class MainActivity : AppCompatActivity() {
             if (field.text.toString().trim().isEmpty()) {
                 field.error = "Required"
                 field.requestFocus()
+                scrollView.smoothScrollTo(0, field.top - 200)
                 return false
             }
         }
@@ -130,7 +171,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun predict() {
         try {
-            // 21 features — same order as training
             val inputData = floatArrayOf(
                 etAge.getFloat(),
                 spSex.selectedItemPosition.toFloat(),
@@ -155,24 +195,11 @@ class MainActivity : AppCompatActivity() {
                 etPCT.getFloat()
             )
 
-            // Create tensor — 2D array format
             val inputArray = Array(1) { inputData }
             val inputTensor = OnnxTensor.createTensor(env, inputArray)
-
-            // Get input name from model
             val inputName = session.inputNames.iterator().next()
-            Log.d("ONNX", "Using input name: $inputName")
 
-            // Run inference
             val results = session.run(mapOf(inputName to inputTensor))
-
-            // Debug: check output types
-            for (i in 0 until results.size()) {
-                val output = results.get(i)
-                Log.d("ONNX", "Output[$i] type: ${output.type}, value class: ${output.value.javaClass.name}")
-            }
-
-            // Parse probability
             val chance = extractProbability(results)
 
             inputTensor.close()
@@ -181,53 +208,50 @@ class MainActivity : AppCompatActivity() {
             showResultDialog(chance)
 
         } catch (e: Exception) {
-            Toast.makeText(this, "Prediction error: ${e.message}",
-                Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Prediction error: ${e.message}", Toast.LENGTH_LONG).show()
             Log.e("ONNX", "Predict error", e)
         }
     }
 
     private fun extractProbability(results: OrtSession.Result): Double {
         try {
-            // Logcat showed: Output[1] type: ONNX_TYPE_SEQUENCE, value class: java.util.Collections$UnmodifiableRandomAccessList
-            // This usually corresponds to List<Map<Long, Float>> for ZipMap in sklearn-onnx
             val probOutput = results.get(1).value
-            
             if (probOutput is List<*>) {
                 val firstRow = probOutput[0]
                 if (firstRow is Map<*, *>) {
-                    // Try to get class 1 (Anemia) probability
-                    // Map keys can be Long, Int, or String depending on the model's ZipMap configuration
-                    val prob = (firstRow[1L] ?: firstRow[1] ?: firstRow["1"] ?: firstRow[1.toInt()]) as? Float
-                    
-                    if (prob != null) {
-                        return (prob * 100).toDouble()
-                    }
-                    
-                    // Fallback: if there are 2 classes, the second one is usually the positive class
-                    val values = firstRow.values.toList()
-                    if (values.size >= 2) {
-                        val p1 = values[1] as? Float
-                        if (p1 != null) return (p1 * 100).toDouble()
-                    }
+                    val prob = firstRow[1L] as? Float
+                        ?: firstRow[1] as? Float
+                        ?: firstRow.values.last() as Float
+                    return (prob * 100).toDouble()
+                }
+            }
+            if (probOutput is Array<*>) {
+                val firstRow = probOutput[0]
+                if (firstRow is Map<*, *>) {
+                    val prob = firstRow[1L] as? Float
+                        ?: firstRow[1] as? Float
+                        ?: firstRow.values.last() as Float
+                    return (prob * 100).toDouble()
+                }
+                if (firstRow is FloatArray) {
+                    return (firstRow[1] * 100).toDouble()
                 }
             }
         } catch (e: Exception) {
-            Log.e("ONNX", "Sequence parsing failed: ${e.message}")
+            Log.e("ONNX", "Parse method 1 failed", e)
         }
 
         try {
-            // Alternate Method: Output is 2D float array [[prob_0, prob_1]]
-            val output = results.get(1).value
+            val output = results.get(0).value
             if (output is Array<*> && output[0] is FloatArray) {
                 val probs = output[0] as FloatArray
-                if (probs.size >= 2) return (probs[1] * 100).toDouble()
+                return (probs[1] * 100).toDouble()
             }
         } catch (e: Exception) {
-            Log.e("ONNX", "Float array parsing failed: ${e.message}")
+            Log.e("ONNX", "Parse method 2 failed", e)
         }
 
-        throw Exception("Could not parse model output. Check Logcat for ONNX debug info.")
+        throw Exception("Could not parse model output")
     }
 
     private fun showResultDialog(chance: Double) {
@@ -251,63 +275,89 @@ class MainActivity : AppCompatActivity() {
         val riskText = getRiskLabel(roundedChance)
         val riskBgColor = getRiskBgColor(roundedChance)
 
-        // Set colors
         tvPercent.setTextColor(riskColor)
         tvPercentSign.setTextColor(riskColor)
         tvRiskLabel.setTextColor(riskColor)
         tvRiskLabel.text = riskText
 
-        // Badge background
         val badgeBg = tvRiskLabel.background as GradientDrawable
         badgeBg.setColor(riskBgColor)
 
-        // Message
         val colorHex = String.format("#%06X", 0xFFFFFF and riskColor)
         val msg = "Based on CBC report, patient has <b><font color='$colorHex'>" +
                 "${String.format("%.1f", roundedChance)}%</font></b> possibility of being <b>Anemic</b>"
         tvMessage.text = Html.fromHtml(msg, Html.FROM_HTML_MODE_LEGACY)
 
-        tvPercent.text = String.format("%.0f", roundedChance)
-        progressCircle.progress = roundedChance.toInt()
-        riskBar.progress = roundedChance.toInt()
+        val circleDrawable = progressCircle.progressDrawable as LayerDrawable
+        circleDrawable.findDrawableByLayerId(android.R.id.progress)
+            .setColorFilter(riskColor, PorterDuff.Mode.SRC_IN)
 
-        // Change risk bar color
-        riskBar.progressTintList = android.content.res.ColorStateList.valueOf(riskColor)
+        riskBar.progressDrawable.setColorFilter(riskColor, PorterDuff.Mode.SRC_IN)
 
-        btnClose.setOnClickListener {
-            dialog.dismiss()
+        ObjectAnimator.ofInt(progressCircle, "progress", 0, roundedChance.toInt()).apply {
+            duration = 1500
+            interpolator = DecelerateInterpolator()
+            start()
         }
 
+        ObjectAnimator.ofInt(riskBar, "progress", 0, roundedChance.toInt()).apply {
+            duration = 1500
+            interpolator = DecelerateInterpolator()
+            start()
+        }
+
+        val handler = Handler(Looper.getMainLooper())
+        var current = 0.0
+        val step = roundedChance / 60.0
+        val counter = object : Runnable {
+            override fun run() {
+                current += step
+                if (current >= roundedChance) {
+                    tvPercent.text = String.format("%.1f", roundedChance)
+                } else {
+                    tvPercent.text = String.format("%.1f", current)
+                    handler.postDelayed(this, 20)
+                }
+            }
+        }
+        handler.postDelayed(counter, 200)
+
+        btnClose.setOnClickListener { dialog.dismiss() }
         dialog.show()
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.92).toInt(),
+            android.view.WindowManager.LayoutParams.WRAP_CONTENT
+        )
     }
 
-    private fun getRiskColor(chance: Double): Int {
-        return when {
-            chance < 30 -> Color.parseColor("#4CAF50") // Green
-            chance < 70 -> Color.parseColor("#FF9800") // Orange
-            else -> Color.parseColor("#F44336") // Red
-        }
+    private fun getRiskColor(value: Double): Int = when {
+        value <= 30 -> Color.parseColor("#0f9d58")
+        value <= 50 -> Color.parseColor("#f9ab00")
+        value <= 70 -> Color.parseColor("#e8710a")
+        else -> Color.parseColor("#db4437")
     }
 
-    private fun getRiskBgColor(chance: Double): Int {
-        return when {
-            chance < 30 -> Color.parseColor("#E8F5E9")
-            chance < 70 -> Color.parseColor("#FFF3E0")
-            else -> Color.parseColor("#FFEBEE")
-        }
+    private fun getRiskLabel(value: Double): String = when {
+        value <= 30 -> "LOW RISK"
+        value <= 50 -> "MODERATE RISK"
+        value <= 70 -> "HIGH RISK"
+        else -> "VERY HIGH RISK"
     }
 
-    private fun getRiskLabel(chance: Double): String {
-        return when {
-            chance < 30 -> "LOW RISK"
-            chance < 70 -> "MEDIUM RISK"
-            else -> "HIGH RISK"
-        }
+    private fun getRiskBgColor(value: Double): Int = when {
+        value <= 30 -> Color.parseColor("#e6f4ea")
+        value <= 50 -> Color.parseColor("#fef7e0")
+        value <= 70 -> Color.parseColor("#fce8e6")
+        else -> Color.parseColor("#fce8e6")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (::session.isInitialized) session.close()
-        if (::env.isInitialized) env.close()
+        try {
+            if (::session.isInitialized) session.close()
+            if (::env.isInitialized) env.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main"
+    android:id="@+id/scrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
     android:fillViewport="true"
+    android:fitsSystemWindows="true"
+    android:overScrollMode="always"
+    android:scrollbars="vertical"
     tools:context=".MainActivity">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
         android:orientation="vertical">
 
         <!-- Header -->
@@ -27,7 +33,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 android:letterSpacing="0.1"
-                android:text="🩸 AI-POWERED DIAGNOSTICS"
+                android:text="🩸 OFFLINE AI DIAGNOSTICS"
                 android:textColor="#55ffffff"
                 android:textSize="10sp" />
 
@@ -43,7 +49,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Enter CBC parameters for prediction"
+                android:text="No internet required • Runs on device"
                 android:textColor="#88ffffff"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -54,7 +60,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Patient Info Card -->
+            <!-- Patient Info -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -66,7 +72,7 @@
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView xmlns:app="http://schemas.android.com/apk/res-auto"
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -94,7 +100,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 35"
+                        android:imeOptions="actionNext"
                         android:inputType="number"
+                        android:nextFocusDown="@+id/etHemoglobin"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -127,7 +135,7 @@
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView xmlns:app="http://schemas.android.com/apk/res-auto"
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -155,7 +163,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 12.5"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etESR"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -173,13 +183,15 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 20"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etWBC"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- WBC Card -->
+            <!-- WBC -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -191,7 +203,7 @@
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView xmlns:app="http://schemas.android.com/apk/res-auto"
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -219,7 +231,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 7.5"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etNeutrophils"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -238,7 +252,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 60"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etLymphocytes"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -257,7 +273,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 30"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etMonocytes"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -276,7 +294,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 5"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etEosinophils"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -295,7 +315,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 3"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etBasophils"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -313,13 +335,15 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 0.5"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etRBC"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- RBC Card -->
+            <!-- RBC -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -331,7 +355,7 @@
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView xmlns:app="http://schemas.android.com/apk/res-auto"
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -359,7 +383,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 4.5"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etHCT"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -378,7 +404,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 40"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etMCV"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -397,7 +425,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 88"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etMCH"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -416,7 +446,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 29"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etMCHC"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -435,7 +467,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 33"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etRDWCV"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -454,7 +488,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 13"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etRDWSD"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -472,13 +508,15 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 42"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etPlatelet"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Platelet Card -->
+            <!-- Platelet -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -490,7 +528,7 @@
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView xmlns:app="http://schemas.android.com/apk/res-auto"
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -518,7 +556,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 250"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etMPV"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -537,7 +577,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 9.5"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etPDW"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -556,7 +598,9 @@
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 12"
+                        android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
+                        android:nextFocusDown="@+id/etPCT"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
 
@@ -574,14 +618,15 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/input_bg"
                         android:hint="e.g. 0.25"
+                        android:imeOptions="actionDone"
                         android:inputType="numberDecimal"
                         android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Predict Button -->
-            <com.google.android.material.button.MaterialButton xmlns:app="http://schemas.android.com/apk/res-auto"
+            <!-- Button -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPredict"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
@@ -591,7 +636,6 @@
                 android:textSize="15sp"
                 app:cornerRadius="12dp" />
 
-            <!-- Footer -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
