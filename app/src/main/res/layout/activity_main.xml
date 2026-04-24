@@ -26,7 +26,7 @@
             android:background="@color/primary"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="28dp">
+            android:padding="25dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -34,24 +34,17 @@
                 android:layout_marginBottom="8dp"
                 android:letterSpacing="0.1"
                 android:text="🩸 OFFLINE AI DIAGNOSTICS"
-                android:textColor="#55ffffff"
-                android:textSize="10sp" />
+                android:textColor="#3286AB"
+                android:textSize="12sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Anemia Detection"
                 android:textColor="#ffffff"
-                android:textSize="22sp"
+                android:textSize="24sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="No internet required • Runs on device"
-                android:textColor="#88ffffff"
-                android:textSize="12sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -220,7 +213,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="4dp"
-                        android:text="WBC (×10³/µL)"
+                        android:text="WBC (µL)"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
@@ -230,7 +223,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
-                        android:hint="e.g. 7.5"
+                        android:hint="e.g. 7500"
                         android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
                         android:nextFocusDown="@+id/etNeutrophils"
@@ -545,7 +538,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="4dp"
-                        android:text="Platelet (×10³/µL)"
+                        android:text="Platelet (µL)"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
@@ -555,7 +548,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
                         android:background="@drawable/input_bg"
-                        android:hint="e.g. 250"
+                        android:hint="e.g. 255000"
                         android:imeOptions="actionNext"
                         android:inputType="numberDecimal"
                         android:nextFocusDown="@+id/etMPV"
@@ -643,7 +636,7 @@
                 android:padding="16dp"
                 android:text="⚕️ For screening purposes only. Consult a healthcare professional."
                 android:textColor="#bbbbbb"
-                android:textSize="10sp" />
+                android:textSize="12sp" />
 
         </LinearLayout>
     </LinearLayout>

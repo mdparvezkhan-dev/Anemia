@@ -22,7 +22,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -45,5 +46,4 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     implementation(libs.material.v1130)
     implementation(libs.okhttp)
-    implementation(libs.onnxruntime.android)
 }

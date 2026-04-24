@@ -18,14 +18,13 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var env: OrtEnvironment
-    private lateinit var session: OrtSession
+    // Forest model data
+    private lateinit var forest: List<TreeNode>
 
     private lateinit var etAge: EditText
     private lateinit var spSex: Spinner
@@ -51,12 +50,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnPredict: MaterialButton
     private lateinit var scrollView: ScrollView
 
+    // Tree structure
+    data class TreeNode(
+        val feature: IntArray,
+        val threshold: DoubleArray,
+        val childrenLeft: IntArray,
+        val childrenRight: IntArray,
+        val value: Array<IntArray>
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         initViews()
-        loadModel()
+        loadForestModel()
         setupKeyboardHandling()
 
         btnPredict.setOnClickListener {
@@ -93,6 +101,88 @@ class MainActivity : AppCompatActivity() {
         btnPredict = findViewById(R.id.btnPredict)
     }
 
+
+    //  LOAD JSON FOREST MODEL
+    private fun loadForestModel() {
+        try {
+            val jsonString = assets.open("anemia_forest.json")
+                .bufferedReader().use { it.readText() }
+
+            val jsonArray = JSONArray(jsonString)
+            val trees = mutableListOf<TreeNode>()
+
+            for (i in 0 until jsonArray.length()) {
+                val tree = jsonArray.getJSONObject(i)
+
+                val feature = jsonArrayToIntArray(tree.getJSONArray("feature"))
+                val threshold = jsonArrayToDoubleArray(tree.getJSONArray("threshold"))
+                val childrenLeft = jsonArrayToIntArray(tree.getJSONArray("children_left"))
+                val childrenRight = jsonArrayToIntArray(tree.getJSONArray("children_right"))
+
+                val valueJson = tree.getJSONArray("value")
+                val value = Array(valueJson.length()) { j ->
+                    val pair = valueJson.getJSONArray(j)
+                    intArrayOf(pair.getInt(0), pair.getInt(1))
+                }
+
+                trees.add(TreeNode(feature, threshold, childrenLeft, childrenRight, value))
+            }
+
+            forest = trees
+            Log.d("MODEL", "✅ Loaded ${forest.size} trees")
+
+        } catch (e: Exception) {
+            Toast.makeText(this, "Model load error: ${e.message}", Toast.LENGTH_LONG).show()
+            Log.e("MODEL", "Error", e)
+        }
+    }
+
+    private fun jsonArrayToIntArray(arr: JSONArray): IntArray {
+        return IntArray(arr.length()) { arr.getInt(it) }
+    }
+
+    private fun jsonArrayToDoubleArray(arr: JSONArray): DoubleArray {
+        return DoubleArray(arr.length()) { arr.getDouble(it) }
+    }
+
+    //  PREDICT — RUN FOREST MANUALLY
+    private fun predictTree(tree: TreeNode, features: DoubleArray): DoubleArray {
+        var nodeId = 0
+
+        while (tree.childrenLeft[nodeId] != -1) {  // -1 = leaf node
+            val featureIndex = tree.feature[nodeId]
+            val threshold = tree.threshold[nodeId]
+
+            nodeId = if (features[featureIndex] <= threshold) {
+                tree.childrenLeft[nodeId]
+            } else {
+                tree.childrenRight[nodeId]
+            }
+        }
+
+        // Leaf node — return [notAnemic, anemic] counts
+        val counts = tree.value[nodeId]
+        val total = counts[0] + counts[1]
+        return doubleArrayOf(
+            counts[0].toDouble() / total,
+            counts[1].toDouble() / total
+        )
+    }
+
+    private fun predictForest(features: DoubleArray): Double {
+        var totalProb = 0.0
+
+        for (tree in forest) {
+            val probs = predictTree(tree, features)
+            totalProb += probs[1]  // anemia probability
+        }
+
+        // Average across all trees
+        return (totalProb / forest.size) * 100
+    }
+
+
+    //  KEYBOARD HANDLING
     private fun setupKeyboardHandling() {
         val allFields = listOf(
             etAge, etHemoglobin, etESR, etWBC, etNeutrophils,
@@ -105,16 +195,11 @@ class MainActivity : AppCompatActivity() {
             field.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
                     Handler(Looper.getMainLooper()).postDelayed({
-                        // Get actual position on screen
                         val location = IntArray(2)
                         view.getLocationInWindow(location)
-
-                        val scrollViewLocation = IntArray(2)
-                        scrollView.getLocationInWindow(scrollViewLocation)
-
-                        // Calculate how much to scroll
-                        val scrollTo = scrollView.scrollY + location[1] - scrollViewLocation[1] - 150
-
+                        val svLoc = IntArray(2)
+                        scrollView.getLocationInWindow(svLoc)
+                        val scrollTo = scrollView.scrollY + location[1] - svLoc[1] - 150
                         scrollView.smoothScrollTo(0, scrollTo.coerceAtLeast(0))
                     }, 350)
                 }
@@ -126,6 +211,7 @@ class MainActivity : AppCompatActivity() {
             true
         }
     }
+
     private fun hideKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         currentFocus?.let {
@@ -134,18 +220,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadModel() {
-        try {
-            env = OrtEnvironment.getEnvironment()
-            val modelBytes = assets.open("anemia_model.onnx").readBytes()
-            session = env.createSession(modelBytes)
-            Log.d("ONNX", "Model loaded. Inputs: ${session.inputNames}, Outputs: ${session.outputNames}")
-        } catch (e: Exception) {
-            Toast.makeText(this, "Model load error: ${e.message}", Toast.LENGTH_LONG).show()
-            Log.e("ONNX", "Load error", e)
-        }
-    }
 
+    //  VALIDATION & PREDICT
     private fun validateInputs(): Boolean {
         val fields = listOf(
             etAge, etHemoglobin, etESR, etWBC, etNeutrophils,
@@ -158,105 +234,61 @@ class MainActivity : AppCompatActivity() {
             if (field.text.toString().trim().isEmpty()) {
                 field.error = "Required"
                 field.requestFocus()
-                scrollView.smoothScrollTo(0, field.top - 200)
+                val location = IntArray(2)
+                field.getLocationInWindow(location)
+                val svLoc = IntArray(2)
+                scrollView.getLocationInWindow(svLoc)
+                scrollView.smoothScrollTo(0, (scrollView.scrollY + location[1] - svLoc[1] - 150).coerceAtLeast(0))
                 return false
             }
         }
         return true
     }
 
-    private fun EditText.getFloat(): Float {
-        return this.text.toString().trim().toFloat()
+    private fun EditText.getDouble(): Double {
+        return this.text.toString().trim().toDouble()
     }
 
     private fun predict() {
         try {
-            val inputData = floatArrayOf(
-                etAge.getFloat(),
-                spSex.selectedItemPosition.toFloat(),
-                etHemoglobin.getFloat(),
-                etESR.getFloat(),
-                etWBC.getFloat(),
-                etNeutrophils.getFloat(),
-                etLymphocytes.getFloat(),
-                etMonocytes.getFloat(),
-                etEosinophils.getFloat(),
-                etBasophils.getFloat(),
-                etRBC.getFloat(),
-                etHCT.getFloat(),
-                etMCV.getFloat(),
-                etMCH.getFloat(),
-                etMCHC.getFloat(),
-                etRDWCV.getFloat(),
-                etRDWSD.getFloat(),
-                etPlatelet.getFloat(),
-                etMPV.getFloat(),
-                etPDW.getFloat(),
-                etPCT.getFloat()
+            // 21 features — same order as training
+            val features = doubleArrayOf(
+                etAge.getDouble(),
+                spSex.selectedItemPosition.toDouble(),
+                etHemoglobin.getDouble(),
+                etESR.getDouble(),
+                etWBC.getDouble(),
+                etNeutrophils.getDouble(),
+                etLymphocytes.getDouble(),
+                etMonocytes.getDouble(),
+                etEosinophils.getDouble(),
+                etBasophils.getDouble(),
+                etRBC.getDouble(),
+                etHCT.getDouble(),
+                etMCV.getDouble(),
+                etMCH.getDouble(),
+                etMCHC.getDouble(),
+                etRDWCV.getDouble(),
+                etRDWSD.getDouble(),
+                etPlatelet.getDouble(),
+                etMPV.getDouble(),
+                etPDW.getDouble(),
+                etPCT.getDouble()
             )
 
-            val inputArray = Array(1) { inputData }
-            val inputTensor = OnnxTensor.createTensor(env, inputArray)
-            val inputName = session.inputNames.iterator().next()
+            val chance = predictForest(features)
+            val roundedChance = Math.round(chance * 100.0) / 100.0
 
-            val results = session.run(mapOf(inputName to inputTensor))
-            val chance = extractProbability(results)
-
-            inputTensor.close()
-            results.close()
-
-            showResultDialog(chance)
+            showResultDialog(roundedChance)
 
         } catch (e: Exception) {
-            Toast.makeText(this, "Prediction error: ${e.message}", Toast.LENGTH_LONG).show()
-            Log.e("ONNX", "Predict error", e)
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            Log.e("PREDICT", "Error", e)
         }
     }
 
-    private fun extractProbability(results: OrtSession.Result): Double {
-        try {
-            val probOutput = results.get(1).value
-            if (probOutput is List<*>) {
-                val firstRow = probOutput[0]
-                if (firstRow is Map<*, *>) {
-                    val prob = firstRow[1L] as? Float
-                        ?: firstRow[1] as? Float
-                        ?: firstRow.values.last() as Float
-                    return (prob * 100).toDouble()
-                }
-            }
-            if (probOutput is Array<*>) {
-                val firstRow = probOutput[0]
-                if (firstRow is Map<*, *>) {
-                    val prob = firstRow[1L] as? Float
-                        ?: firstRow[1] as? Float
-                        ?: firstRow.values.last() as Float
-                    return (prob * 100).toDouble()
-                }
-                if (firstRow is FloatArray) {
-                    return (firstRow[1] * 100).toDouble()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("ONNX", "Parse method 1 failed", e)
-        }
-
-        try {
-            val output = results.get(0).value
-            if (output is Array<*> && output[0] is FloatArray) {
-                val probs = output[0] as FloatArray
-                return (probs[1] * 100).toDouble()
-            }
-        } catch (e: Exception) {
-            Log.e("ONNX", "Parse method 2 failed", e)
-        }
-
-        throw Exception("Could not parse model output")
-    }
-
+    //  RESULT DIALOG
     private fun showResultDialog(chance: Double) {
-        val roundedChance = Math.round(chance * 100.0) / 100.0
-
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(R.layout.dialog_result)
@@ -271,9 +303,9 @@ class MainActivity : AppCompatActivity() {
         val riskBar = dialog.findViewById<ProgressBar>(R.id.riskBar)
         val btnClose = dialog.findViewById<MaterialButton>(R.id.btnClose)
 
-        val riskColor = getRiskColor(roundedChance)
-        val riskText = getRiskLabel(roundedChance)
-        val riskBgColor = getRiskBgColor(roundedChance)
+        val riskColor = getRiskColor(chance)
+        val riskText = getRiskLabel(chance)
+        val riskBgColor = getRiskBgColor(chance)
 
         tvPercent.setTextColor(riskColor)
         tvPercentSign.setTextColor(riskColor)
@@ -285,7 +317,7 @@ class MainActivity : AppCompatActivity() {
 
         val colorHex = String.format("#%06X", 0xFFFFFF and riskColor)
         val msg = "Based on CBC report, patient has <b><font color='$colorHex'>" +
-                "${String.format("%.1f", roundedChance)}%</font></b> possibility of being <b>Anemic</b>"
+                "${String.format("%.1f", chance)}%</font></b> possibility of being <b>Anemic</b>"
         tvMessage.text = Html.fromHtml(msg, Html.FROM_HTML_MODE_LEGACY)
 
         val circleDrawable = progressCircle.progressDrawable as LayerDrawable
@@ -294,13 +326,13 @@ class MainActivity : AppCompatActivity() {
 
         riskBar.progressDrawable.setColorFilter(riskColor, PorterDuff.Mode.SRC_IN)
 
-        ObjectAnimator.ofInt(progressCircle, "progress", 0, roundedChance.toInt()).apply {
+        ObjectAnimator.ofInt(progressCircle, "progress", 0, chance.toInt()).apply {
             duration = 1500
             interpolator = DecelerateInterpolator()
             start()
         }
 
-        ObjectAnimator.ofInt(riskBar, "progress", 0, roundedChance.toInt()).apply {
+        ObjectAnimator.ofInt(riskBar, "progress", 0, chance.toInt()).apply {
             duration = 1500
             interpolator = DecelerateInterpolator()
             start()
@@ -308,12 +340,12 @@ class MainActivity : AppCompatActivity() {
 
         val handler = Handler(Looper.getMainLooper())
         var current = 0.0
-        val step = roundedChance / 60.0
+        val step = chance / 60.0
         val counter = object : Runnable {
             override fun run() {
                 current += step
-                if (current >= roundedChance) {
-                    tvPercent.text = String.format("%.1f", roundedChance)
+                if (current >= chance) {
+                    tvPercent.text = String.format("%.1f", chance)
                 } else {
                     tvPercent.text = String.format("%.1f", current)
                     handler.postDelayed(this, 20)
@@ -324,6 +356,7 @@ class MainActivity : AppCompatActivity() {
 
         btnClose.setOnClickListener { dialog.dismiss() }
         dialog.show()
+
         dialog.window?.setLayout(
             (resources.displayMetrics.widthPixels * 0.92).toInt(),
             android.view.WindowManager.LayoutParams.WRAP_CONTENT
@@ -349,15 +382,5 @@ class MainActivity : AppCompatActivity() {
         value <= 50 -> Color.parseColor("#fef7e0")
         value <= 70 -> Color.parseColor("#fce8e6")
         else -> Color.parseColor("#fce8e6")
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        try {
-            if (::session.isInitialized) session.close()
-            if (::env.isInitialized) env.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
     }
 }
